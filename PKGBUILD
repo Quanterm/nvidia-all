@@ -48,7 +48,7 @@ if [ -z "$_driver_version" ] || [ "$_driver_version" = "latest" ] || [ -z "$_dri
     fi
   fi
   if [[ -z $CONDITION ]]; then
-    read -p "    Which driver version do you want?`echo $'\n    > 1.Vulkan dev: 525.47.35\n      2.535 series: 535.104.05\n      3.530 series: 530.41.03\n      4.470 series: 470.199.02\n      5.Older series\n      6.Custom version (396.xx series or higher)\n    choice[1-6?]: '`" CONDITION;
+    read -p "    Which driver version do you want?`echo $'\n    > 1.Vulkan dev: 535.43.09\n      2.535 series: 535.104.05\n      3.530 series: 530.41.03\n      4.470 series: 470.199.02\n      5.Older series\n      6.Custom version (396.xx series or higher)\n    choice[1-6?]: '`" CONDITION;
   fi
     # This will be treated as the latest regular driver.
     if [ "$CONDITION" = "2" ]; then
@@ -144,8 +144,8 @@ if [ -z "$_driver_version" ] || [ "$_driver_version" = "latest" ] || [ -z "$_dri
       echo "_driver_version=$_driver_version" >> options
     # This (condition 1) will be treated as the latest Vulkan developer driver.
     else
-      echo '_driver_version=525.47.35' > options
-      echo '_md5sum=2c69451d36a8b6423ff61d80eaa6c442' >> options
+      echo '_driver_version=535.43.09' > options
+      echo '_md5sum=770a4aa9c62c746d3f078cfc89199081' >> options
       echo '_driver_branch=vulkandev' >> options
     fi
 # Package type selector
@@ -356,6 +356,7 @@ source=($_source_name
         'kernel-6.2.patch'
         'kernel-6.3.patch'
         'kernel-6.4.patch'
+        'kernel-6.5.patch'
 )
 
 msg2 "Selected driver integrity check behavior (md5sum or SKIP): $_md5sum" # If the driver is "known", return md5sum. If it isn't, return SKIP
@@ -401,7 +402,8 @@ md5sums=("$_md5sum"
          '0b9b855d9be313153a5903e46e774a30'
          '5d573b1aa0712b9bd2000c9fefdf84c2'
          'a6acbba08173769399658914eb86a212'
-         '4f855bb0e0b84e8e5d072c687256767a')
+         '4f855bb0e0b84e8e5d072c687256767a'
+         'b81cac7573842ebd7af30fdf851c63f9')
 
 if [ "$_open_source_modules" = "true" ]; then
   source+=("$pkgname-$pkgver.tar.gz::https://github.com/NVIDIA/open-gpu-kernel-modules/archive/refs/tags/${pkgver}.tar.gz")
@@ -812,6 +814,11 @@ DEST_MODULE_LOCATION[3]="/kernel/drivers/video"' dkms.conf
         _kernel64="1"
         _whitelist64=( 470.4* 470.5* 470.6* 470.7* 470.8* 470.9* 470.10* 470.12* 470.14* 470.16* 470.18* 530* )
       fi
+      # 6.5
+      if (( $(vercmp "$_kernel" "6.5") >= 0 )); then
+        _kernel65="1"
+        _whitelist65=(525* 530* 535.5* 535.43.02)
+      fi
 
       # Loop patches (linux-4.15.patch, lol.patch, ...)
       for _p in $(printf -- '%s\n' ${source[@]} | grep .patch); do  # https://stackoverflow.com/a/21058239/1821548
@@ -887,7 +894,9 @@ DEST_MODULE_LOCATION[3]="/kernel/drivers/video"' dkms.conf
         if [ "$_patch" = "6.4" ]; then
           _whitelist=(${_whitelist64[@]})
         fi
-
+        if [ "$_patch" = "6.5" ]; then
+          _whitelist=(${_whitelist65[@]})
+        fi
         patchy=0
         if (( $(vercmp "$_kernel" "$_patch") >= 0 )); then
           for yup in "${_whitelist[@]}"; do
@@ -1280,7 +1289,19 @@ DEST_MODULE_LOCATION[3]="/kernel/drivers/video"' dkms.conf
           msg2 "Skipping kernel-6.4.patch as it doesn't apply to this driver version..."
         fi
       fi
-
+      # 6.5
+      if [ "$_kernel65" = "1" ]; then
+        patchy=0
+        for yup in "${_whitelist65[@]}"; do
+          [[ $pkgver = $yup ]] && patchy=1
+        done
+        if [ "$patchy" = "1" ]; then
+          msg2 "Applying kernel-6.5.patch for dkms..."
+          patch -Np1 -i "$srcdir"/kernel-6.5.patch
+        else
+          msg2 "Skipping kernel-6.5.patch as it doesn't apply to this driver version..."
+        fi
+      fi
       # Legacy quirks
       if [ "$_oldstuff" = "1" ]; then
         msg2 "Applying 01-ipmi-vm.diff for dkms..."
